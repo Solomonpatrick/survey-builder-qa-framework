@@ -1,0 +1,32 @@
+{
+  "name": "survey-builder-qa",
+  "version": "1.0.0",
+  "description": "Playwright + Cucumber JS test framework for Survey Builder",
+  "main": "index.js",
+  "scripts": {
+    "bdd": "npx cucumber-js --profile playwright",
+    "codegen": "npx playwright codegen",
+    "report": "npx playwright show-report"
+  },
+  "keywords": [
+    "playwright",
+    "cucumber",
+    "typescript",
+    "testing"
+  ],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@cucumber/cucumber": "^10.0.1",
+    "@playwright/test": "^1.51.0",
+    "dotenv": "^16.0.3",
+    "ts-node": "^10.9.1",
+    "typescript": "^5.0.4",
+    "uuid": "^9.0.0"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^5.1.0",
+    "node-fetch": "^3.3.2"
+  }
+}
