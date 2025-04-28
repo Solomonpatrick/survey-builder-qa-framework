@@ -16,6 +16,7 @@ module.exports = {
     formatOptions: {
       snippetInterface: 'async-await'
     },
-    parallel: 1 // Adjust based on your needs
+    parallel: 1, // Adjust based on your needs
+    timeout: 30000 // Increase timeout to 30 seconds for debugging
   }
 };

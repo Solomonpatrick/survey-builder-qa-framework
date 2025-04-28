@@ -1,0 +1,669 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Survey Builder</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .error {
+            color: red;
+            margin-top: 5px;
+        }
+        .hidden {
+            display: none;
+        }
+        button {
+            margin-right: 10px;
+            margin-top: 10px;
+            cursor: pointer;
+        }
+        .option-container {
+            margin-top: 10px;
+        }
+        .survey-list {
+            margin-top: 20px;
+            border-top: 1px solid #ccc;
+            padding-top: 20px;
+        }
+        .survey-item {
+            padding: 10px;
+            border: 1px solid #ddd;
+            margin-bottom: 10px;
+            position: relative;
+        }
+        .survey-item:hover .actions {
+            display: flex;
+        }
+        .actions {
+            position: absolute;
+            right: 10px;
+            top: 10px;
+            gap: 5px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Survey Builder</h1>
+    
+    <div id="main-page">
+        <button id="create-survey-btn" role="button" name="Create New Survey">Create New Survey</button>
+        
+        <div class="survey-list" role="list" aria-label="Survey List">
+            <h2>Your Surveys</h2>
+            <div id="survey-list-items"></div>
+        </div>
+    </div>
+    
+    <div id="survey-editor" class="hidden">
+        <h2>Create Survey</h2>
+        
+        <div>
+            <label for="survey-title">Survey Title</label>
+            <input type="text" id="survey-title" aria-label="Survey Title">
+            <div id="title-validation" class="error hidden">Survey title is required</div>
+        </div>
+        
+        <div id="questions-container"></div>
+        
+        <button id="add-question-btn" role="button" name="Add Question">Add Question</button>
+        <button id="save-survey-btn" role="button" name="Save Survey">Save Survey</button>
+        <button id="cancel-btn" role="button" name="Cancel">Cancel</button>
+    </div>
+    
+    <div id="question-template" class="hidden">
+        <div class="question" style="border: 1px solid #ccc; padding: 10px; margin: 10px 0;">
+            <div>
+                <label for="question-type">Question Type</label>
+                <select class="question-type" id="question-type" aria-label="Question Type">
+                    <option value="text">Text</option>
+                    <option value="multiple-choice" role="option" name="Multiple Choice">Multiple Choice</option>
+                    <option value="checkbox">Checkbox</option>
+                </select>
+            </div>
+            
+            <div>
+                <label for="question-title">Question Title</label>
+                <input type="text" class="question-title" id="question-title" aria-label="Question Title">
+                <div class="question-title-validation error hidden">Question title is required</div>
+            </div>
+            
+            <div class="options-container hidden">
+                <h4>Options</h4>
+                <div class="options-list"></div>
+                <button class="add-option-btn" role="button" name="Add Option">Add Option</button>
+                <div class="options-validation error hidden">At least one option is required</div>
+            </div>
+            
+            <button class="remove-question-btn" role="button" name="Remove Question">Remove Question</button>
+        </div>
+    </div>
+    
+    <div id="survey-preview" class="hidden">
+        <h2 id="preview-title"></h2>
+        <div id="preview-questions"></div>
+        <button id="submit-survey-btn" role="button" name="Submit">Submit</button>
+        <button id="back-to-surveys-btn" role="button" name="Back to Surveys">Back to Surveys</button>
+        <div id="submission-confirmation" class="hidden">Thank you for your submission!</div>
+    </div>
+    
+    <div id="survey-management" class="hidden">
+        <h2 id="manage-title"></h2>
+        <button id="publish-btn" role="button" name="Publish">Publish</button>
+        <button id="preview-btn" role="button" name="Preview">Preview</button>
+        <button id="view-responses-btn" role="button" name="View Responses">View Responses</button>
+        <button id="back-btn" role="button" name="Back">Back</button>
+        
+        <div id="responses-container" class="hidden">
+            <h3>Responses</h3>
+            <div id="responses-list"></div>
+        </div>
+    </div>
+    
+    <div id="delete-modal" class="hidden" style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000;">
+        <div style="background: white; padding: 20px; border-radius: 5px;">
+            <h3>Delete Survey</h3>
+            <p>Are you sure you want to delete this survey?</p>
+            <button id="confirm-delete-btn" role="button" name="Confirm">Confirm</button>
+            <button id="cancel-delete-btn" role="button" name="Cancel">Cancel</button>
+        </div>
+    </div>
+    
+    <script>
+        // Global state
+        const state = {
+            surveys: [],
+            currentSurvey: null,
+            editingQuestion: null,
+            currentSurveyId: null
+        };
+        
+        // DOM Elements
+        const mainPage = document.getElementById('main-page');
+        const surveyEditor = document.getElementById('survey-editor');
+        const surveyPreview = document.getElementById('survey-preview');
+        const surveyManagement = document.getElementById('survey-management');
+        const deleteModal = document.getElementById('delete-modal');
+        
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log("DOMContentLoaded event fired");
+            loadSurveys();
+            setupEventListeners();
+        });
+        
+        // Event Listeners
+        function setupEventListeners() {
+            // Create Survey
+            document.getElementById('create-survey-btn').addEventListener('click', () => {
+                console.log("Create Survey button clicked");
+                showSurveyEditor();
+            });
+            
+            document.getElementById('save-survey-btn').addEventListener('click', () => {
+                console.log("Save Survey button clicked");
+                saveSurvey();
+            });
+            
+            document.getElementById('cancel-btn').addEventListener('click', () => {
+                console.log("Cancel button clicked");
+                showMainPage();
+            });
+            
+            // Questions
+            document.getElementById('add-question-btn').addEventListener('click', () => {
+                console.log("Add Question button clicked");
+                addQuestion();
+            });
+            
+            // Preview
+            document.getElementById('submit-survey-btn').addEventListener('click', () => {
+                console.log("Submit Survey button clicked");
+                submitSurveyResponse();
+            });
+            
+            document.getElementById('back-to-surveys-btn').addEventListener('click', () => {
+                console.log("Back to Surveys button clicked");
+                showMainPage();
+            });
+            
+            // Management
+            document.getElementById('publish-btn').addEventListener('click', () => {
+                console.log("Publish button clicked");
+                publishSurvey();
+            });
+            
+            document.getElementById('preview-btn').addEventListener('click', () => {
+                console.log("Preview button clicked");
+                previewSurvey();
+            });
+            
+            document.getElementById('view-responses-btn').addEventListener('click', () => {
+                console.log("View Responses button clicked");
+                viewResponses();
+            });
+            
+            document.getElementById('back-btn').addEventListener('click', () => {
+                console.log("Back button clicked");
+                showMainPage();
+            });
+            
+            // Delete modal
+            document.getElementById('confirm-delete-btn').addEventListener('click', () => {
+                console.log("Confirm Delete button clicked");
+                confirmDeleteSurvey();
+            });
+            
+            document.getElementById('cancel-delete-btn').addEventListener('click', () => {
+                console.log("Cancel Delete button clicked");
+                deleteModal.classList.add('hidden');
+            });
+        }
+        
+        // API Functions
+        async function loadSurveys() {
+            console.log("Loading surveys...");
+            try {
+                const response = await fetch('/api/surveys');
+                state.surveys = await response.json();
+                console.log("Surveys loaded:", state.surveys);
+                renderSurveyList();
+            } catch (error) {
+                console.error('Error loading surveys:', error);
+            }
+        }
+        
+        async function createSurvey(survey) {
+            console.log("Creating survey:", survey);
+            try {
+                const response = await fetch('/api/surveys', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(survey)
+                });
+                const newSurvey = await response.json();
+                console.log("New survey created:", newSurvey);
+                state.surveys.push(newSurvey);
+                state.currentSurveyId = newSurvey.id;
+                return newSurvey;
+            } catch (error) {
+                console.error('Error creating survey:', error);
+            }
+        }
+        
+        async function getSurveyResponses(surveyId) {
+            console.log(`Getting responses for survey ${surveyId}...`);
+            try {
+                const response = await fetch(`/api/surveys/${surveyId}/responses`);
+                const result = await response.json();
+                console.log(`Responses for survey ${surveyId}:`, result);
+                return result;
+            } catch (error) {
+                console.error('Error getting responses:', error);
+                return [];
+            }
+        }
+        
+        async function deleteSurvey(surveyId) {
+            console.log(`Deleting survey ${surveyId}...`);
+            try {
+                await fetch(`/api/surveys/${surveyId}`, {
+                    method: 'DELETE'
+                });
+                console.log(`Survey ${surveyId} deleted`);
+                state.surveys = state.surveys.filter(s => s.id !== surveyId);
+                renderSurveyList();
+                showMainPage();
+            } catch (error) {
+                console.error('Error deleting survey:', error);
+            }
+        }
+        
+        async function submitResponse(surveyId, response) {
+            console.log(`Submitting response for survey ${surveyId}:`, response);
+            try {
+                const apiResponse = await fetch(`/api/surveys/${surveyId}/responses`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(response)
+                });
+                const result = await apiResponse.json();
+                console.log(`Response submitted for survey ${surveyId}:`, result);
+                return result;
+            } catch (error) {
+                console.error('Error submitting response:', error);
+                return null;
+            }
+        }
+        
+        // UI Functions
+        function showSurveyEditor() {
+            console.log("Showing survey editor");
+            clearSurveyEditor();
+            mainPage.classList.add('hidden');
+            surveyPreview.classList.add('hidden');
+            surveyManagement.classList.add('hidden');
+            surveyEditor.classList.remove('hidden');
+        }
+        
+        function showMainPage() {
+            console.log("Showing main page");
+            loadSurveys();
+            mainPage.classList.remove('hidden');
+            surveyEditor.classList.add('hidden');
+            surveyPreview.classList.add('hidden');
+            surveyManagement.classList.add('hidden');
+            deleteModal.classList.add('hidden');
+        }
+        
+        function showManagementPage(surveyId) {
+            console.log(`Showing management page for survey ${surveyId}`);
+            const survey = state.surveys.find(s => s.id === surveyId);
+            if (!survey) {
+                console.error(`Survey with ID ${surveyId} not found`);
+                return;
+            }
+            
+            state.currentSurveyId = surveyId;
+            document.getElementById('manage-title').textContent = survey.title;
+            
+            mainPage.classList.add('hidden');
+            surveyEditor.classList.add('hidden');
+            surveyPreview.classList.add('hidden');
+            document.getElementById('responses-container').classList.add('hidden');
+            surveyManagement.classList.remove('hidden');
+        }
+        
+        function clearSurveyEditor() {
+            console.log("Clearing survey editor");
+            document.getElementById('survey-title').value = '';
+            document.getElementById('title-validation').classList.add('hidden');
+            document.getElementById('questions-container').innerHTML = '';
+            state.currentSurvey = { title: '', questions: [] };
+        }
+        
+        function addQuestion() {
+            console.log("Adding a new question");
+            const questionsContainer = document.getElementById('questions-container');
+            const questionTemplate = document.getElementById('question-template').firstElementChild.cloneNode(true);
+            
+            // Setup accessibility for the new question
+            const questionType = questionTemplate.querySelector('.question-type');
+            questionType.setAttribute('aria-label', 'Question Type');
+            
+            const questionTitle = questionTemplate.querySelector('.question-title');
+            questionTitle.setAttribute('aria-label', 'Question Title');
+            
+            const addOptionBtn = questionTemplate.querySelector('.add-option-btn');
+            addOptionBtn.setAttribute('role', 'button');
+            addOptionBtn.setAttribute('name', 'Add Option');
+            
+            // Setup multiple choice option explicitly
+            const multipleChoiceOption = questionType.querySelector('option[value="multiple-choice"]');
+            if (multipleChoiceOption) {
+                multipleChoiceOption.setAttribute('role', 'option');
+                multipleChoiceOption.setAttribute('name', 'Multiple Choice');
+            }
+            
+            // Add event listeners
+            questionType.addEventListener('change', (event) => toggleOptionsContainer(event));
+            addOptionBtn.addEventListener('click', (event) => addOption(event));
+            
+            questionTemplate.querySelector('.remove-question-btn').addEventListener('click', function() {
+                this.closest('.question').remove();
+            });
+            
+            questionsContainer.appendChild(questionTemplate);
+            
+            // Auto-select Multiple Choice and trigger change event to show options container
+            questionType.value = 'multiple-choice';
+            const changeEvent = new Event('change');
+            questionType.dispatchEvent(changeEvent);
+            
+            // Add first option by default
+            addOption({ target: addOptionBtn });
+        }
+        
+        function toggleOptionsContainer(event) {
+            const questionType = event.target.value;
+            const question = event.target.closest('.question');
+            const optionsContainer = question.querySelector('.options-container');
+            
+            if (questionType === 'multiple-choice' || questionType === 'checkbox') {
+                optionsContainer.classList.remove('hidden');
+            } else {
+                optionsContainer.classList.add('hidden');
+            }
+        }
+        
+        function addOption(event) {
+            const question = event.target.closest('.question');
+            const optionsList = question.querySelector('.options-list');
+            
+            const optionContainer = document.createElement('div');
+            optionContainer.className = 'option-container';
+            
+            const optionInput = document.createElement('input');
+            optionInput.type = 'text';
+            optionInput.className = 'option-input';
+            optionInput.placeholder = 'Enter an option';
+            
+            const removeButton = document.createElement('button');
+            removeButton.textContent = '×';
+            removeButton.addEventListener('click', function() {
+                optionContainer.remove();
+            });
+            
+            optionContainer.appendChild(optionInput);
+            optionContainer.appendChild(removeButton);
+            optionsList.appendChild(optionContainer);
+        }
+        
+        function renderSurveyList() {
+            console.log("Rendering survey list");
+            const listContainer = document.getElementById('survey-list-items');
+            listContainer.innerHTML = '';
+            
+            state.surveys.forEach(survey => {
+                const item = document.createElement('div');
+                item.className = 'survey-item';
+                item.setAttribute('role', 'listitem');
+                
+                const title = document.createElement('h3');
+                title.textContent = survey.title;
+                
+                const date = document.createElement('p');
+                date.textContent = `Created: ${new Date(survey.createdAt).toLocaleDateString()}`;
+                
+                const actions = document.createElement('div');
+                actions.className = 'actions';
+                
+                const manageBtn = document.createElement('button');
+                manageBtn.textContent = 'Manage';
+                manageBtn.setAttribute('role', 'button');
+                manageBtn.setAttribute('name', 'Manage');
+                manageBtn.addEventListener('click', () => {
+                    showManagementPage(survey.id);
+                });
+                
+                const deleteBtn = document.createElement('button');
+                deleteBtn.textContent = 'Delete';
+                deleteBtn.setAttribute('role', 'button');
+                deleteBtn.setAttribute('name', 'Delete');
+                deleteBtn.addEventListener('click', (e) => {
+                    e.stopPropagation(); // Prevent bubbling to parent elements
+                    confirmDelete(survey.id);
+                });
+                
+                actions.appendChild(manageBtn);
+                actions.appendChild(deleteBtn);
+                
+                item.appendChild(title);
+                item.appendChild(date);
+                item.appendChild(actions);
+                
+                listContainer.appendChild(item);
+            });
+            
+            if (state.surveys.length === 0) {
+                const message = document.createElement('p');
+                message.textContent = 'No surveys yet. Click "Create New Survey" to get started.';
+                listContainer.appendChild(message);
+            }
+        }
+        
+        function saveSurvey() {
+            const title = document.getElementById('survey-title').value.trim();
+            const titleValidation = document.getElementById('title-validation');
+            
+            if (!title) {
+                titleValidation.classList.remove('hidden');
+                return;
+            }
+            
+            titleValidation.classList.add('hidden');
+            
+            const questions = Array.from(document.getElementById('questions-container').children).map(questionEl => {
+                const type = questionEl.querySelector('.question-type').value;
+                const questionTitle = questionEl.querySelector('.question-title').value.trim();
+                
+                let options = [];
+                if (type === 'multiple-choice' || type === 'checkbox') {
+                    options = Array.from(questionEl.querySelectorAll('.option-input')).map(input => input.value.trim());
+                }
+                
+                return { type, title: questionTitle, options };
+            });
+            
+            const survey = { title, questions };
+            
+            createSurvey(survey).then(() => {
+                showMainPage();
+            });
+        }
+        
+        function confirmDelete(surveyId) {
+            state.currentSurveyId = surveyId;
+            deleteModal.classList.remove('hidden');
+        }
+        
+        function confirmDeleteSurvey() {
+            if (state.currentSurveyId) {
+                deleteSurvey(state.currentSurveyId);
+            }
+        }
+        
+        function publishSurvey() {
+            alert('Survey published!');
+        }
+        
+        function previewSurvey() {
+            const surveyId = state.currentSurveyId;
+            const survey = state.surveys.find(s => s.id === surveyId);
+            if (!survey) return;
+            
+            document.getElementById('preview-title').textContent = survey.title;
+            
+            const questionsContainer = document.getElementById('preview-questions');
+            questionsContainer.innerHTML = '';
+            
+            survey.questions.forEach((question, index) => {
+                const questionDiv = document.createElement('div');
+                questionDiv.className = 'preview-question';
+                questionDiv.style.margin = '20px 0';
+                
+                const questionTitle = document.createElement('h3');
+                questionTitle.textContent = `${index + 1}. ${question.title}`;
+                questionDiv.appendChild(questionTitle);
+                
+                if (question.type === 'text') {
+                    const input = document.createElement('input');
+                    input.type = 'text';
+                    input.className = 'response-input';
+                    input.dataset.questionIndex = index.toString();
+                    questionDiv.appendChild(input);
+                } else if (question.type === 'multiple-choice') {
+                    question.options.forEach((option, optIndex) => {
+                        const label = document.createElement('label');
+                        label.style.display = 'block';
+                        label.style.margin = '5px 0';
+                        
+                        const radio = document.createElement('input');
+                        radio.type = 'radio';
+                        radio.setAttribute('role', 'radio');
+                        radio.name = `question-${index}`;
+                        radio.value = option;
+                        radio.dataset.questionIndex = index.toString();
+                        radio.dataset.optionIndex = optIndex.toString();
+                        
+                        label.appendChild(radio);
+                        label.appendChild(document.createTextNode(` ${option}`));
+                        questionDiv.appendChild(label);
+                    });
+                } else if (question.type === 'checkbox') {
+                    question.options.forEach((option, optIndex) => {
+                        const label = document.createElement('label');
+                        label.style.display = 'block';
+                        label.style.margin = '5px 0';
+                        
+                        const checkbox = document.createElement('input');
+                        checkbox.type = 'checkbox';
+                        checkbox.name = `question-${index}`;
+                        checkbox.value = option;
+                        checkbox.dataset.questionIndex = index.toString();
+                        checkbox.dataset.optionIndex = optIndex.toString();
+                        
+                        label.appendChild(checkbox);
+                        label.appendChild(document.createTextNode(` ${option}`));
+                        questionDiv.appendChild(label);
+                    });
+                }
+                
+                questionsContainer.appendChild(questionDiv);
+            });
+            
+            mainPage.classList.add('hidden');
+            surveyEditor.classList.add('hidden');
+            surveyManagement.classList.add('hidden');
+            document.getElementById('submission-confirmation').classList.add('hidden');
+            surveyPreview.classList.remove('hidden');
+        }
+        
+        function submitSurveyResponse() {
+            const surveyId = state.currentSurveyId;
+            const survey = state.surveys.find(s => s.id === surveyId);
+            if (!survey) return;
+            
+            const responses = survey.questions.map((question, index) => {
+                if (question.type === 'text') {
+                    const input = document.querySelector(`.response-input[data-question-index="${index}"]`);
+                    return {
+                        questionTitle: question.title,
+                        answer: input ? input.value : ''
+                    };
+                } else if (question.type === 'multiple-choice') {
+                    const selectedOption = document.querySelector(`input[name="question-${index}"]:checked`);
+                    return {
+                        questionTitle: question.title,
+                        answer: selectedOption ? question.options[selectedOption.dataset.optionIndex] : null
+                    };
+                } else if (question.type === 'checkbox') {
+                    const selectedOptions = Array.from(document.querySelectorAll(`input[name="question-${index}"]:checked`));
+                    return {
+                        questionTitle: question.title,
+                        answer: selectedOptions.map(opt => question.options[opt.dataset.optionIndex])
+                    };
+                }
+            });
+            
+            document.getElementById('submission-confirmation').classList.remove('hidden');
+            
+            submitResponse(surveyId, { responses }).then(() => {
+                setTimeout(() => {
+                    showMainPage();
+                }, 1000);
+            });
+        }
+        
+        function viewResponses() {
+            const surveyId = state.currentSurveyId;
+            
+            getSurveyResponses(surveyId).then(responses => {
+                const container = document.getElementById('responses-container');
+                const list = document.getElementById('responses-list');
+                list.innerHTML = '';
+                
+                if (responses.length === 0) {
+                    list.innerHTML = '<p>No responses yet.</p>';
+                } else {
+                    responses.forEach((response, index) => {
+                        const responseDiv = document.createElement('div');
+                        responseDiv.style.border = '1px solid #ddd';
+                        responseDiv.style.padding = '10px';
+                        responseDiv.style.marginBottom = '10px';
+                        
+                        const header = document.createElement('h4');
+                        header.textContent = `Response #${index + 1} - ${new Date(response.submittedAt).toLocaleString()}`;
+                        responseDiv.appendChild(header);
+                        
+                        response.responses.forEach(answer => {
+                            const answerP = document.createElement('p');
+                            answerP.innerHTML = `<strong>${answer.questionTitle}</strong>: ${Array.isArray(answer.answer) ? answer.answer.join(', ') : answer.answer}`;
+                            responseDiv.appendChild(answerP);
+                        });
+                        
+                        list.appendChild(responseDiv);
+                    });
+                }
+                
+                container.classList.remove('hidden');
+            });
+        }
+    </script>
+</body>
+</html>

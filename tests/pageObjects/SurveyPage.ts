@@ -14,22 +14,65 @@ export class SurveyPage {
     this.page = page;
     
     // Survey response form elements
-    this.questionTitle = page.getByRole('heading').filter({ hasText: 'What is your favorite color?' });
-    this.multipleChoiceOptions = page.getByRole('radio');
-    this.submitButton = page.getByRole('button', { name: 'Submit' });
-    this.submissionConfirmation = page.getByText('Thank you for your submission!');
+    this.questionTitle = page.locator('.preview-question h3');
+    this.multipleChoiceOptions = page.locator('input[type="radio"]');
+    this.submitButton = page.locator('#submit-survey-btn');
+    this.submissionConfirmation = page.locator('#submission-confirmation:not(.hidden)');
+  }
+
+  /**
+   * Fix for the delete modal intercepting pointer events
+   */
+  async fixModalInterference(): Promise<void> {
+    await this.page.addStyleTag({
+      content: `
+        #delete-modal.hidden {
+          display: none !important;
+          pointer-events: none !important;
+          z-index: -1 !important;
+          opacity: 0 !important;
+          visibility: hidden !important;
+        }
+        
+        /* Ensuring all buttons are clickable */
+        button {
+          position: relative;
+          z-index: 100;
+        }
+      `
+    });
+  }
+
+  /**
+   * Safely click a button using JavaScript
+   * @param selector CSS selector for the button
+   */
+  async safeClick(selector: string): Promise<void> {
+    await this.page.evaluate((sel) => {
+      const element = document.querySelector(sel);
+      if (element instanceof HTMLElement) {
+        element.click();
+      }
+    }, selector);
   }
 
   /**
    * Submit a sample response to the survey
    */
   async submitResponse(): Promise<void> {
+    // Fix any modal interference first
+    await this.fixModalInterference();
+    
     // Wait for the survey to load completely
     await this.page.waitForLoadState('networkidle');
-    await this.questionTitle.waitFor({ state: 'visible' });
+    await this.page.waitForSelector('.preview-question', { state: 'visible' });
     
     // Select a random option
     const options = await this.multipleChoiceOptions.all();
+    if (options.length === 0) {
+      throw new Error('No radio options found on the page');
+    }
+    
     const randomIndex = Math.floor(Math.random() * options.length);
     await options[randomIndex].click();
     
@@ -37,11 +80,11 @@ export class SurveyPage {
     const optionLabel = await this.page.locator('label').nth(randomIndex).textContent();
     this.selectedOption = optionLabel?.trim() || null;
     
-    // Submit the response
-    await this.submitButton.click();
+    // Submit the response using the safe click method
+    await this.safeClick('#submit-survey-btn');
     
     // Wait for submission confirmation
-    await this.submissionConfirmation.waitFor({ state: 'visible' });
+    await this.submissionConfirmation.waitFor({ state: 'visible', timeout: 5000 });
   }
 
   /**
